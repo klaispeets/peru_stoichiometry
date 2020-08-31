@@ -1,10 +1,10 @@
 setwd("/Users/riina82/work/OTHERS/Kristian/peru")
 library(mgcv)
 library(vegan)
-load("peru_short.RData")
+rm(list=ls())
 
-idx = which(!is.na(peru$APA) & !is.na(peru$LAP))
-data = peru[idx,]
+load("peru_short.RData")
+data = peru
 
 #PON misses the values on 8th day, DON & DOP on the 28th day. Use each mesocosms 10 day value for missing PON, and mean of 26 & 30 day for DON & DOP.
 mesoc = unique(data$MesoC)
@@ -218,3 +218,10 @@ summary(gam(LAP ~ s(MDS2, k = 4), data = results))# R=0.31
 
 summary(gam(APA ~ s(MDS1, k = 4) + s(MDS2, k = 4), data = results))
 summary(gam(LAP ~ s(MDS1, k = 4) + s(MDS2, k = 4), data = results))
+
+
+plot(gam_APA)
+plot(gam_LAP)
+
+library(clipr)
+write_clip(results)
