@@ -1,10 +1,15 @@
+rm(list=ls())
+#Se working directory
 setwd("/Users/riina82/work/OTHERS/Kristian/peru")
 library(mgcv)
 library(vegan)
-rm(list=ls())
+library(clipr)
 
 load("peru_short.RData")
 data = peru
+
+use_existing = T # If this is T (TRUE) then it means it will use the earlier saved NMDS output (to assure that figures and results are exactly the same)
+if(use_existing){load("NMDS output.RData")} else {
 
 #PON misses the values on 8th day, DON & DOP on the 28th day. Use each mesocosms 10 day value for missing PON, and mean of 26 & 30 day for DON & DOP.
 mesoc = unique(data$MesoC)
@@ -18,35 +23,32 @@ for(i in 1:length(mesoc)){
   
   data$DON[idx] = mean(data$DON[idx2])
   data$DOP[idx] = mean(data$DOP[idx2])
-  
 }
-
 
 #Select the biogeochemical variables
 set1 = subset(data, select = c("DIN", "PO4", "Dsi", "Chla", "POC", "PON", "POP", "Bsi", "DON", "DOP"))
-
 #Select the phytoplankton variables
 set2 = subset(data, select= c("FL4.group", "Synechococcus", "Cryptophytes","Chains","Picoeukaryotes","Nano","Mikro.I", "Mikro.II"   ))
-
 library(vegan)
-
 mds_env = metaMDS(set1, trymax = 100)
 mds_phy = metaMDS(set2, trymax = 100)
+} #END of if loop
+
 
 env_mds = data.frame(mds_env$points)
 phy_mds = data.frame(mds_phy$points)
 names(env_mds) = c("Emds1", "Emds2")
 names(phy_mds) = c("Pmds1", "Pmds2")
-
 result = data.frame(subset(data, select = c("MesoC", "DAY", "Treatment", "APA", "LAP")), env_mds, phy_mds)
 
 #Analyses
-library(mgcv)
-#APA
-gam_APA= gam(APA ~ s(Emds1, k = 4) + s(Emds2, k = 4) + s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result)
-summary(gam_APA)#73
 
-#Figure 1
+gam_APA= gam(APA ~ s(Emds1, k = 4) + s(Emds2, k = 4) + s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result)
+summary(gam_APA)
+gam_LAP= gam(LAP ~ s(Emds1, k = 4) + s(Emds2, k = 4) + s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result)
+summary(gam_LAP)
+
+#Figure 1 (Figure_1_APA_vs_(a)bgMDS1_(b)bgMDS2_(c)phyMDS1_(d)phyMDS2)
 par(mfrow=c(2,2), mar = c(2.5,2.5,1,1), mgp = c(1.5,0.5, 0))
 library(colorRamps)
 library(plotrix)
@@ -59,20 +61,19 @@ xr = quantile(seq(min(result$Emds1), max(result$Emds1), length.out = 10),1)
 yt = quantile(seq(min(result$APA), max(result$APA), length.out = 10),0.95)
 
 for(i in 1:4){
-newdata = result[,c(6:9)]
-set = c(1:4)[-i]
-for(j in 1:3){newdata[,set[j]] = mean(newdata[,set[j]])}   
-pred = predict(gam_APA, newdata = newdata, se =T)
-plot(result$APA ~ newdata[,i], ylab = "", xlab = "", main = "", col = col, pch = 16)
-if(i==1){color.legend(xl,yb,xr,yt, col.text,matlab.like(16),align="lt",gradient="y", cex=0.7)}
-idx = order(newdata[,i])
-lines(pred$fit[idx] ~ newdata[idx,i],col = 1)
-lines(pred$fit[idx] + 2*pred$se.fit[idx] ~ newdata[idx,i],col = 1, lty = 2)
-lines(pred$fit[idx] - 2*pred$se.fit[idx] ~ newdata[idx,i],col = 1, lty = 2)
+  newdata = result[,c(6:9)]
+  set = c(1:4)[-i]
+  for(j in 1:3){newdata[,set[j]] = mean(newdata[,set[j]])}   
+  pred = predict(gam_APA, newdata = newdata, se =T)
+  plot(result$APA ~ newdata[,i], ylab = "", xlab = "", main = "", col = col, pch = 16)
+  if(i==1){color.legend(xl,yb,xr,yt, col.text,matlab.like(16),align="lt",gradient="y", cex=0.7)}
+  idx = order(newdata[,i])
+  lines(pred$fit[idx] ~ newdata[idx,i],col = 1)
+  lines(pred$fit[idx] + 2*pred$se.fit[idx] ~ newdata[idx,i],col = 1, lty = 2)
+  lines(pred$fit[idx] - 2*pred$se.fit[idx] ~ newdata[idx,i],col = 1, lty = 2)
 }
 
 #Figure 2
-gam_LAP= gam(LAP ~ s(Emds1, k = 4) + s(Emds2, k = 4) + s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result)
 
 yb = quantile(seq(min(result$LAP), max(result$LAP), length.out = 10),0.4)
 yt = quantile(seq(min(result$LAP), max(result$LAP), length.out = 10),0.95)
@@ -91,38 +92,76 @@ for(i in 1:4){
   pred = predict(gam_LAP, newdata = newdata, se =T)
   plot(result$LAP ~ newdata[,i], ylab = "", xlab = "", main = "", col = col, pch = 16)
   if(i==2){color.legend(xl,yb,xr,yt, col.text,matlab.like(16),align="lt",gradient="y", cex=0.7)}
-   idx = order(newdata[,i])
+  idx = order(newdata[,i])
   lines(pred$fit[idx] ~ newdata[idx,i],col = 1)
   lines(pred$fit[idx] + 2*pred$se.fit[idx] ~ newdata[idx,i],col = 1, lty = 2)
   lines(pred$fit[idx] - 2*pred$se.fit[idx] ~ newdata[idx,i],col = 1, lty = 2)
 }
 
 
+#Produce text with model description and R sq and Dev expl. values
+set = NULL
+m = gam(APA ~ s(Emds1, k = 4), data = result)
+t = paste0("summary(gam(APA ~ s(Emds1, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=1, t)
+set = rbind(set, t)
 
-summary(gam(APA ~ s(Emds1, k = 4), data = result))
-summary(gam(APA ~ s(Emds2, k = 4), data = result))
-summary(gam(APA ~ s(Pmds1, k = 4), data = result))
-summary(gam(APA ~ s(Pmds2, k = 4), data = result))
+m = gam(APA ~ s(Emds2, k = 4), data = result)
+t = paste0("summary(gam(APA ~ s(Emds2, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n= 2, t)
+set = rbind(set, t)
 
-summary(gam(LAP ~ s(Emds1, k = 4), data = result))
-summary(gam(LAP ~ s(Emds2, k = 4), data = result))
-summary(gam(LAP ~ s(Pmds1, k = 4), data = result))
-summary(gam(LAP ~ s(Pmds2, k = 4), data = result))
+m = gam(APA ~ s(Pmds1, k = 4), data = result)
+t = paste0("summary(gam(APA ~ s(Pmds1, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=3, t)
+set = rbind(set, t)
 
-summary(gam(APA ~ s(Emds1, k = 4) + s(Emds2, k = 4), data = result))
-summary(gam(APA ~ s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result))
-summary(gam(LAP ~ s(Emds1, k = 4) + s(Emds2, k = 4), data = result))
-summary(gam(LAP ~ s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result))
+m = gam(APA ~ s(Pmds2, k = 4), data = result)
+t = paste0("summary(gam(APA ~ s(Pmds2, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=4, t)
+set = rbind(set, t)
+
+m = gam(LAP ~ s(Emds1, k = 4), data = result)
+t = paste0("summary(gam(LAP ~ s(Emds1, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=5, t)
+set = rbind(set, t)
+
+m = gam(LAP ~ s(Emds2, k = 4), data = result)
+t = paste0("summary(gam(LAP ~ s(Emds2, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=6, t)
+set = rbind(set, t)
+
+m = gam(LAP ~ s(Pmds1, k = 4), data = result)
+t = paste0("summary(gam(LAP ~ s(Pmds1, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=7, t)
+set = rbind(set, t)
+
+m = gam(LAP ~ s(Pmds2, k = 4), data = result)
+t = paste0("summary(gam(LAP ~ s(Pmds2, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=8, t)
+set = rbind(set, t)
 
 
+m = gam(APA ~ s(Emds1, k = 4) + s(Emds2, k = 4), data = result)
+t = paste0("summary(gam(APA ~ s(Emds1, k = 4) + s(Emds2, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=9, t)
+set = rbind(set, t)
 
+m = gam(APA ~ s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result)
+t = paste0("summary(gam(APA ~ s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=10, t)
+set = rbind(set, t)
 
-summary(gam_LAP) # R2 0.249, mostly linear.
+m = gam(LAP ~ s(Emds1, k = 4) + s(Emds2, k = 4), data = result)
+t = paste0("summary(gam(LAP ~ s(Emds1, k = 4) + s(Emds2, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=11, t)
+set = rbind(set, t)
 
-summary(gam(LAP ~ s(Emds1, k = 4), data = result))#R2 adj: 0.175
-summary(gam(LAP ~ s(Emds2, k = 4), data = result))#0.134
-summary(gam(LAP ~ s(Pmds1, k = 4), data = result))#0.0645
-summary(gam(LAP ~ s(Pmds2, k = 4), data = result))#0.08
+m = gam(LAP ~ s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result)
+t = paste0("summary(gam(LAP ~ s(Pmds1, k = 4) + s(Pmds2, k = 4), data = result)) # ", round(summary(m)$dev.expl*100, digits = 1)," %", round(summary(m)$r.sq, digits = 3))
+t = data.frame(n=12, t)
+set = rbind(set, t)
+
 
 par(mfrow=c(1,1),mar = c(2.5,2.5,1,1), mgp = c(1.5,0.5, 0), cex.axis = 0.9)
 sp = data.frame(mds_env$species)
@@ -157,7 +196,7 @@ color.legend(pos$x[1], pos$y[1], pos$x[2], pos$y[2],  col.text,matlab.like(16),a
 
 load("peru_data_with_bacteria.RData")
 bac2 = bac[,c(6:126)]
-mds_bac = metaMDS(bac2, trymax = 100)
+if(!use_existing){mds_bac = metaMDS(bac2, trymax = 100)} # If use_existing is FALSE (!use_existing) then run new NMDS, otherwise use the object loaded already earlier in script
 
 sp = data.frame(mds_bac$species)
 p = data.frame(mds_bac$points)
@@ -175,7 +214,6 @@ text(sp$MDS2, sp$MDS1, labels = row.names(sp), cex = 0.6, col =2)
 pos = locator(2)
 color.legend(pos$x[1], pos$y[1], pos$x[2], pos$y[2],  col.text,matlab.like(16),align="lt",gradient="y")
 
-
 results = data.frame(bac[,c(1:5)],p)
 gam_LAP = gam(LAP ~ s(MDS1, k = 4) + s(MDS2, k = 4), data = results)
 gam_APA = gam(APA ~ s(MDS1, k = 4) + s(MDS2, k = 4), data = results)
@@ -185,7 +223,6 @@ yb = quantile(seq(min(results$APA), max(results$APA), length.out = 10),0.4)
 yt = quantile(seq(min(result$APA), max(result$APA), length.out = 10),0.95)
 xr = quantile(seq(min(results$MDS2), max(results$MDS2), length.out = 10),1)
 xl = quantile(seq(min(results$MDS2), max(results$MDS2), length.out = 10),0.9)
-
 
 par(mfrow=c(2,2), mar = c(2.5,2.5,2,1), mgp = c(1.5,0.5, 0))
 for(i in 1:2){
@@ -215,13 +252,7 @@ summary(gam(APA ~ s(MDS1, k = 4), data = results))# R=0.47
 summary(gam(APA ~ s(MDS2, k = 4), data = results))# R=0.311
 summary(gam(LAP ~ s(MDS1, k = 4), data = results))# R=0.02
 summary(gam(LAP ~ s(MDS2, k = 4), data = results))# R=0.31
-
 summary(gam(APA ~ s(MDS1, k = 4) + s(MDS2, k = 4), data = results))
 summary(gam(LAP ~ s(MDS1, k = 4) + s(MDS2, k = 4), data = results))
 
-
-plot(gam_APA)
-plot(gam_LAP)
-
-library(clipr)
 write_clip(results)
